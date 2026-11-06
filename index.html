@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vote: Mais Criativo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Source+Sans+3:wght@400;600&display=swap">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <p class="selo">Oscar da Física · IFMG Betim</p>
+  <h1 id="titulo">Vote no mais criativo</h1>
+  <p class="apoio" id="aviso" aria-live="polite">Carregando…</p>
+  <div class="opcoes" id="opcoes"></div>
+  <button class="botao" id="confirmar" hidden disabled>Confirmar voto</button>
+</main>
+<script src="config.js"></script>
+<script>
+(function () {
+  var titulo = document.getElementById("titulo"), aviso = document.getElementById("aviso");
+  var opcoes = document.getElementById("opcoes"), botao = document.getElementById("confirmar");
+  var escolhido = null;
+
+  function ler(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function gravar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function uuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, function (c) {
+      return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
+    });
+  }
+  var aparelho = ler("oscar-aparelho");
+  if (!aparelho) { aparelho = uuid(); gravar("oscar-aparelho", aparelho); }
+
+  function encerrar(tituloTxt, avisoTxt) {
+    titulo.textContent = tituloTxt; aviso.textContent = avisoTxt;
+    aviso.className = "apoio"; opcoes.textContent = ""; botao.hidden = true;
+  }
+  function votoRegistrado() {
+    gravar("oscar-votou", "1");
+    encerrar("Voto registrado!", "Obrigado por participar. O resultado sai no telão.");
+  }
+  function mostrar(candidatos) {
+    aviso.textContent = "Toque em um vídeo e confirme. Cada aparelho vota uma vez.";
+    opcoes.textContent = "";
+    candidatos.forEach(function (c) {
+      var b = document.createElement("button"), n = document.createElement("strong");
+      b.className = "opcao"; b.type = "button"; b.id = "c" + c.id;
+      b.setAttribute("aria-pressed", "false");
+      n.textContent = c.nome; b.append(n);
+      if (c.grupo) { var g = document.createElement("span"); g.textContent = c.grupo; b.append(g); }
+      b.addEventListener("click", function () {
+        escolhido = c.id;
+        opcoes.querySelectorAll(".opcao").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+        botao.disabled = false;
+      });
+      opcoes.append(b);
+    });
+    botao.hidden = false;
+  }
+  async function comRepeticao(fn) {
+    for (var i = 0; ; i++) {
+      try { return await fn(); }
+      catch (e) {
+        if (i >= 3) throw e;
+        await new Promise(function (r) { setTimeout(r, 800 * (i + 1) + Math.random() * 800); });
+      }
+    }
+  }
+  async function carregar() {
+    if (ler("oscar-votou")) return votoRegistrado();
+    try {
+      var e = await comRepeticao(function () { return chamar("estado"); });
+      if (!e.aberta) {
+        encerrar("Votação fechada", "Quando a votação abrir, toque em Atualizar.");
+        var b = document.createElement("button");
+        b.className = "botao"; b.id = "atualizar"; b.textContent = "Atualizar";
+        b.addEventListener("click", carregar); opcoes.append(b);
+        return;
+      }
+      titulo.textContent = "Vote no mais criativo";
+      mostrar(e.candidatos);
+    } catch (err) {
+      encerrar("Sem conexão", "Não consegui abrir a votação. Confira a internet e toque em Atualizar.");
+      var r = document.createElement("button");
+      r.className = "botao"; r.id = "atualizar"; r.textContent = "Atualizar";
+      r.addEventListener("click", carregar); opcoes.append(r);
+    }
+  }
+  botao.addEventListener("click", async function () {
+    botao.disabled = true; botao.textContent = "Enviando…";
+    try {
+      var r = await comRepeticao(function () { return chamar("votar", { p_aparelho: aparelho, p_candidato: escolhido }); });
+      if (r === "ok" || r === "repetido") return votoRegistrado();
+      if (r === "fechada") return encerrar("Votação encerrada", "Seu voto não entrou porque a votação já fechou.");
+      throw new Error(r);
+    } catch (err) {
+      aviso.textContent = "Seu voto não foi enviado. Confira a internet e tente de novo.";
+      aviso.className = "erro"; botao.disabled = false; botao.textContent = "Tentar de novo";
+    }
+  });
+  carregar();
+})();
+</script>
+</body>
+</html>
