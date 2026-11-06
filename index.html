@@ -37,8 +37,9 @@
     titulo.textContent = tituloTxt; aviso.textContent = avisoTxt;
     aviso.className = "apoio"; opcoes.textContent = ""; botao.hidden = true;
   }
+  var rodada = null;
   function votoRegistrado() {
-    gravar("oscar-votou", "1");
+    if (rodada !== null) gravar("oscar-votou", String(rodada));
     encerrar("Voto registrado!", "Obrigado por participar. O resultado sai no telão.");
   }
   function mostrar(candidatos) {
@@ -69,9 +70,10 @@
     }
   }
   async function carregar() {
-    if (ler("oscar-votou")) return votoRegistrado();
     try {
       var e = await comRepeticao(function () { return chamar("estado"); });
+      rodada = e.rodada;
+      if (ler("oscar-votou") === String(rodada)) return votoRegistrado();
       if (!e.aberta) {
         encerrar("Votação fechada", "Quando a votação abrir, toque em Atualizar.");
         var b = document.createElement("button");
